@@ -90,8 +90,6 @@ describe('Layout.calculateRows urlFilter', () => {
         ]);
         const { rows } = Layout.calculateRows(entries, 1000, { urlFilter: '*.google.com' });
         expect(rows).toHaveLength(2);
-        // `row.index` carries entry._originalIndex (the pre-filter position) —
-        // row.url is a formatted "hostname - pathname" display string, not the raw URL.
         expect(rows.map(r => r.index)).toEqual([0, 2]);
     });
 
@@ -139,7 +137,6 @@ describe('Layout.calculateRows urlFilter', () => {
             'https://www.google.com/b',
             'https://example.com/c'
         ]);
-        // reqFilter keeps requests #1-2 (1-based), urlFilter further restricts to google.com.
         const { rows } = Layout.calculateRows(entries, 1000, {
             reqFilter: '1-2',
             urlFilter: '*.google.com'
