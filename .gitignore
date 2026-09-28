@@ -42,3 +42,6 @@ Thumbs.db
 Sample/Implementations/webpagetest
 Sample/Implementations/wptagent
 deploy.sh
+
+# Superpowers brainstorming session artifacts (mockups, state)
+.superpowers/
