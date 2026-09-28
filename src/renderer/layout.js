@@ -125,7 +125,7 @@ export class Layout {
             const u = new URL(fullUrl);
             const combined = `${u.hostname} - ${u.pathname}`;
             if (combined.length <= maxLength) return combined;
-            
+
             const half = Math.floor((maxLength - 3) / 2);
             return combined.substring(0, half) + '...' + combined.substring(combined.length - half);
         } catch {
@@ -133,6 +133,54 @@ export class Layout {
             const half = Math.floor((maxLength - 3) / 2);
             return fullUrl.substring(0, half) + '...' + fullUrl.substring(fullUrl.length - half);
         }
+    }
+
+    /**
+     * Compiles a comma-separated urlFilter string into include/exclude RegExp arrays.
+     * Each token: optional leading '-' (routes to excludes), then either a /regex/
+     * (interior used as raw source) or a glob (only '*' is a wildcard; all other
+     * regex metacharacters are escaped literally). All patterns are unanchored
+     * (substring match) and case-insensitive. Malformed regex tokens are dropped
+     * silently — this mirrors reqFilter's forgiving parse behavior and avoids
+     * error UI flicker while a regex is mid-edit.
+     * @param {string} filterStr
+     * @returns {{includes: RegExp[], excludes: RegExp[]}}
+     */
+    static parseUrlFilter(filterStr) {
+        const includes = [];
+        const excludes = [];
+        if (!filterStr) return { includes, excludes };
+
+        const tokens = String(filterStr).split(',');
+        tokens.forEach(rawToken => {
+            let token = rawToken.trim();
+            if (token === '') return;
+
+            let isExclude = false;
+            if (token.startsWith('-')) {
+                isExclude = true;
+                token = token.slice(1);
+            }
+            if (token === '') return;
+
+            let source;
+            if (token.length > 1 && token.startsWith('/') && token.endsWith('/')) {
+                source = token.slice(1, -1);
+            } else {
+                // Escape regex metacharacters except '*', then turn '*' into '.*'.
+                const escaped = token.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
+                source = escaped.replace(/\*/g, '.*');
+            }
+
+            try {
+                const re = new RegExp(source, 'i');
+                (isExclude ? excludes : includes).push(re);
+            } catch {
+                // Malformed regex — drop the token entirely.
+            }
+        });
+
+        return { includes, excludes };
     }
 
     static calculateRows(entries, canvasWidth = 1012, options = {}) {
