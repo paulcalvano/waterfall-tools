@@ -227,6 +227,18 @@ export class Layout {
             }
         }
 
+        if (!options.connectionView && options.urlFilter) {
+            const { includes, excludes } = Layout.parseUrlFilter(options.urlFilter);
+            if (includes.length > 0 || excludes.length > 0) {
+                entries = entries.filter(entry => {
+                    const url = entry.url || '';
+                    if (excludes.some(re => re.test(url))) return false;
+                    if (includes.length > 0 && !includes.some(re => re.test(url))) return false;
+                    return true;
+                });
+            }
+        }
+
         let thumbMaxReqs = options.thumbMaxReqs;
         if (thumbMaxReqs === undefined) {
             thumbMaxReqs = 100;

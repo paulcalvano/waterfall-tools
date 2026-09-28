@@ -70,3 +70,87 @@ describe('Layout.parseUrlFilter', () => {
         expect(excludes).toHaveLength(0);
     });
 });
+
+describe('Layout.calculateRows urlFilter', () => {
+    const makeEntries = (urls) => urls.map((url, i) => ({
+        index: i,
+        url,
+        mimeType: 'text/html',
+        status: 200,
+        time_start: i * 10,
+        time_end: i * 10 + 5,
+        timings: { dns: 0, connect: 0, ssl: 0, send: 0, wait: 2, receive: 3 }
+    }));
+
+    it('include-only: keeps only requests matching at least one include pattern', () => {
+        const entries = makeEntries([
+            'https://www.google.com/a',
+            'https://example.com/b',
+            'https://sub.google.com/c'
+        ]);
+        const { rows } = Layout.calculateRows(entries, 1000, { urlFilter: '*.google.com' });
+        expect(rows).toHaveLength(2);
+        // `row.index` carries entry._originalIndex (the pre-filter position) —
+        // row.url is a formatted "hostname - pathname" display string, not the raw URL.
+        expect(rows.map(r => r.index)).toEqual([0, 2]);
+    });
+
+    it('exclude-only: drops requests matching any exclude pattern, keeps the rest', () => {
+        const entries = makeEntries([
+            'https://example.com/ads/banner.png',
+            'https://example.com/index.html'
+        ]);
+        const { rows } = Layout.calculateRows(entries, 1000, { urlFilter: '-*/ads/*' });
+        expect(rows).toHaveLength(1);
+        expect(rows[0].index).toBe(1);
+    });
+
+    it('mixed include+exclude: exclude wins even when a URL also matches an include', () => {
+        const entries = makeEntries([
+            'https://example.com/ads/tracker.js',
+            'https://example.com/app.js',
+            'https://other.com/app.js'
+        ]);
+        const { rows } = Layout.calculateRows(entries, 1000, { urlFilter: '*.js,-*/ads/*' });
+        expect(rows.map(r => r.index)).toEqual([1, 2]);
+    });
+
+    it('no matches: returns an empty row set without throwing', () => {
+        const entries = makeEntries(['https://example.com/a']);
+        const { rows } = Layout.calculateRows(entries, 1000, { urlFilter: '*.nomatch.test' });
+        expect(rows).toHaveLength(0);
+    });
+
+    it('connectionView bypasses urlFilter entirely', () => {
+        const entries = makeEntries([
+            'https://example.com/a',
+            'https://other.com/b'
+        ]);
+        const { rows } = Layout.calculateRows(entries, 1000, {
+            urlFilter: '*.nomatch.test',
+            connectionView: true
+        });
+        expect(rows.length).toBeGreaterThan(0);
+    });
+
+    it('combines with reqFilter via AND', () => {
+        const entries = makeEntries([
+            'https://www.google.com/a',
+            'https://www.google.com/b',
+            'https://example.com/c'
+        ]);
+        // reqFilter keeps requests #1-2 (1-based), urlFilter further restricts to google.com.
+        const { rows } = Layout.calculateRows(entries, 1000, {
+            reqFilter: '1-2',
+            urlFilter: '*.google.com'
+        });
+        expect(rows).toHaveLength(2);
+        expect(rows.map(r => r.index).sort()).toEqual([0, 1]);
+    });
+
+    it('empty urlFilter is a no-op', () => {
+        const entries = makeEntries(['https://example.com/a', 'https://other.com/b']);
+        const { rows } = Layout.calculateRows(entries, 1000, { urlFilter: '' });
+        expect(rows).toHaveLength(2);
+    });
+});
