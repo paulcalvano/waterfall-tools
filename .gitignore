@@ -45,3 +45,6 @@ deploy.sh
 
 # Superpowers brainstorming session artifacts (mockups, state)
 .superpowers/
+
+# Git worktrees for isolated feature work
+.worktrees/
