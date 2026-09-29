@@ -69,6 +69,35 @@ describe('Layout.parseUrlFilter', () => {
         expect(includes).toHaveLength(1);
         expect(excludes).toHaveLength(0);
     });
+
+    it('does not split a comma inside a regex quantifier (e.g. {1,3})', () => {
+        const { includes } = Layout.parseUrlFilter('/^cdn\\d{1,3}\\.example\\.com$/');
+        expect(includes).toHaveLength(1);
+        expect(includes[0].source).toBe('^cdn\\d{1,3}\\.example\\.com$');
+        expect(includes[0].test('cdn12.example.com')).toBe(true);
+        expect(includes[0].test('cdn1234.example.com')).toBe(false);
+    });
+
+    it('still splits on the comma that follows a closed regex literal', () => {
+        const { includes } = Layout.parseUrlFilter('/^cdn\\d{1,3}\\.example\\.com$/,*.google.com');
+        expect(includes).toHaveLength(2);
+        expect(includes[0].source).toBe('^cdn\\d{1,3}\\.example\\.com$');
+        expect(includes[1].source).toBe('.*\\.google\\.com');
+    });
+});
+
+describe('Layout.splitFilterTokens', () => {
+    it('splits plain comma-separated tokens', () => {
+        expect(Layout.splitFilterTokens('a,b,c')).toEqual(['a', 'b', 'c']);
+    });
+
+    it('does not split on a comma inside an open /regex/ literal', () => {
+        expect(Layout.splitFilterTokens('/a{1,3}/,b')).toEqual(['/a{1,3}/', 'b']);
+    });
+
+    it('treats an escaped slash as a literal character, not a delimiter toggle', () => {
+        expect(Layout.splitFilterTokens('/a\\/b,c/,d')).toEqual(['/a\\/b,c/', 'd']);
+    });
 });
 
 describe('Layout.getFilterHost', () => {

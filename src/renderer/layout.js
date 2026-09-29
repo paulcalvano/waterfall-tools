@@ -136,6 +136,42 @@ export class Layout {
     }
 
     /**
+     * Splits a urlFilter string on top-level commas only — commas inside an
+     * open `/regex/` literal (e.g. the quantifier in `/^cdn\d{1,3}\./`) don't
+     * count as separators. Tracks an `inRegex` toggle that flips on every
+     * unescaped `/`; a `\` always consumes the following character verbatim
+     * so an escaped slash (`\/`) inside a pattern can't prematurely close it.
+     * @param {string} filterStr
+     * @returns {string[]}
+     */
+    static splitFilterTokens(filterStr) {
+        const tokens = [];
+        let current = '';
+        let inRegex = false;
+        for (let i = 0; i < filterStr.length; i++) {
+            const ch = filterStr[i];
+            if (ch === '\\' && i + 1 < filterStr.length) {
+                current += ch + filterStr[i + 1];
+                i++;
+                continue;
+            }
+            if (ch === '/') {
+                inRegex = !inRegex;
+                current += ch;
+                continue;
+            }
+            if (ch === ',' && !inRegex) {
+                tokens.push(current);
+                current = '';
+                continue;
+            }
+            current += ch;
+        }
+        tokens.push(current);
+        return tokens;
+    }
+
+    /**
      * Compiles a comma-separated urlFilter string into include/exclude RegExp arrays.
      * Patterns are matched against the request's **hostname only** (see
      * `Layout.getFilterHost()`), never the full URL/path — this keeps domain
@@ -146,7 +182,9 @@ export class Layout {
      * All patterns are unanchored (substring match) and case-insensitive.
      * Malformed regex tokens are dropped silently — this mirrors reqFilter's
      * forgiving parse behavior and avoids error UI flicker while a regex is
-     * mid-edit.
+     * mid-edit. Commas are only treated as token separators outside an open
+     * `/regex/` literal (see `Layout.splitFilterTokens()`), so quantifiers
+     * like `/^cdn\d{1,3}\./` survive intact.
      * @param {string} filterStr
      * @returns {{includes: RegExp[], excludes: RegExp[]}}
      */
@@ -155,7 +193,7 @@ export class Layout {
         const excludes = [];
         if (!filterStr) return { includes, excludes };
 
-        const tokens = String(filterStr).split(',');
+        const tokens = Layout.splitFilterTokens(String(filterStr));
         tokens.forEach(rawToken => {
             let token = rawToken.trim();
             if (token === '') return;
