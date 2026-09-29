@@ -137,12 +137,16 @@ export class Layout {
 
     /**
      * Compiles a comma-separated urlFilter string into include/exclude RegExp arrays.
-     * Each token: optional leading '-' (routes to excludes), then either a /regex/
-     * (interior used as raw source) or a glob (only '*' is a wildcard; all other
-     * regex metacharacters are escaped literally). All patterns are unanchored
-     * (substring match) and case-insensitive. Malformed regex tokens are dropped
-     * silently — this mirrors reqFilter's forgiving parse behavior and avoids
-     * error UI flicker while a regex is mid-edit.
+     * Patterns are matched against the request's **hostname only** (see
+     * `Layout.getFilterHost()`), never the full URL/path — this keeps domain
+     * filtering reliable regardless of what appears in a request's path or
+     * query string. Each token: optional leading '-' (routes to excludes),
+     * then either a /regex/ (interior used as raw source) or a glob (only '*'
+     * is a wildcard; all other regex metacharacters are escaped literally).
+     * All patterns are unanchored (substring match) and case-insensitive.
+     * Malformed regex tokens are dropped silently — this mirrors reqFilter's
+     * forgiving parse behavior and avoids error UI flicker while a regex is
+     * mid-edit.
      * @param {string} filterStr
      * @returns {{includes: RegExp[], excludes: RegExp[]}}
      */
@@ -181,6 +185,23 @@ export class Layout {
         });
 
         return { includes, excludes };
+    }
+
+    /**
+     * Extracts the hostname to match urlFilter patterns against. Falls back to
+     * the raw url string when `new URL()` throws (opaque/unparseable URLs) so
+     * a malformed entry still participates in filtering rather than always
+     * matching or always failing.
+     * @param {string} url
+     * @returns {string}
+     */
+    static getFilterHost(url) {
+        if (!url) return '';
+        try {
+            return new URL(url).hostname;
+        } catch {
+            return url;
+        }
     }
 
     static calculateRows(entries, canvasWidth = 1012, options = {}) {
@@ -231,9 +252,9 @@ export class Layout {
             const { includes, excludes } = Layout.parseUrlFilter(options.urlFilter);
             if (includes.length > 0 || excludes.length > 0) {
                 entries = entries.filter(entry => {
-                    const url = entry.url || '';
-                    if (excludes.some(re => re.test(url))) return false;
-                    if (includes.length > 0 && !includes.some(re => re.test(url))) return false;
+                    const host = Layout.getFilterHost(entry.url);
+                    if (excludes.some(re => re.test(host))) return false;
+                    if (includes.length > 0 && !includes.some(re => re.test(host))) return false;
                     return true;
                 });
             }

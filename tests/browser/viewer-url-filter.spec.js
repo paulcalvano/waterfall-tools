@@ -62,9 +62,10 @@ test('urlFilter narrows visible requests and Connection View bypasses it', async
     const unfilteredHeight = await waitForStableHeight(canvas);
     expect(unfilteredHeight).toBeGreaterThan(0);
 
-    // Open Options and type a domain filter that only a subset of the
-    // fixture's hosts match (www.google.com, accounts.google.com, etc. —
-    // NOT lh3.googleusercontent.com / fonts.gstatic.com / www.gstatic.com).
+    // Open Options and type a domain filter (the "Domain pattern" field)
+    // that only a subset of the fixture's hosts match (www.google.com,
+    // accounts.google.com, etc. — NOT lh3.googleusercontent.com /
+    // fonts.gstatic.com / www.gstatic.com).
     await page.locator('#btn-settings').click();
     await expect(page.locator('#settings-overlay')).not.toHaveClass(/hidden/);
 
